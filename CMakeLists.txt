@@ -1,19 +1,40 @@
 cmake_minimum_required(VERSION 2.8.11)
 
-project(dbgPlugin CXX C)
+project(chaiScriptPlugin CXX C)
 
-set(x64dbgfolder C:/tools/x64dbg )
+if(NOT X64DBGFOLDER)
+    if($ENV{X64DBGFOLDER})
+        set(X64DBGFOLDER $ENV{X64DBGFOLDER} )
+    else()
+        set(X64DBGFOLDER .. )
+    endif()
+endif()
 
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${x64dbgfolder}/release/x32/plugins)
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${x64dbgfolder}/release/x32/plugins)
+if(${CMAKE_SIZEOF_VOID_P} EQUAL 4)
+    set(ARCH "32")
+else()
+    set(ARCH "64")
+endif()
 
-include_directories( ${x64dbgfolder} )
-LINK_DIRECTORIES( ${x64dbgfolder}/pluginsdk )
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${X64DBGFOLDER}/release/x${ARCH}/plugins)
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${X64DBGFOLDER}/release/x${ARCH}/plugins)
 
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOMOC ON)
 
-add_library(dbgPlugin SHARED
-    main.cc
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+
+find_package(Qt5Widgets)
+find_package(Qt5Core)
+
+include_directories( . ${X64DBGFOLDER} ChaiScript/include)
+LINK_DIRECTORIES( ${X64DBGFOLDER}/pluginsdk )
+
+add_library(chaiScriptPlugin SHARED
+    pluginmain.cc
+    dbgops.h
+    chaiInterops.h
 )
 
-target_link_libraries(dbgPlugin x32dbg x32bridge )
-set_target_properties(dbgPlugin PROPERTIES SUFFIX ".dp32")
+target_link_libraries(chaiScriptPlugin x${ARCH}dbg x${ARCH}bridge Qt5::Core Qt5::Widgets  )
+set_target_properties(chaiScriptPlugin PROPERTIES SUFFIX ".dp${ARCH}")
