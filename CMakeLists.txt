@@ -10,30 +10,38 @@ if(NOT X64DBGFOLDER)
     endif()
 endif()
 
-IF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+IF(CMAKE_BUILD_TYPE MATCHES Debug)
     set(SUFFIX "d")
 else()
     set(SUFFIX "")
-ENDIF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+ENDIF()
 
 if(${CMAKE_SIZEOF_VOID_P} EQUAL 4)
     set(ARCH "32")
+    set(ARCH_NAME "86")
 else()
     set(ARCH "64")
+    set(ARCH_NAME "64")
 endif()
-
+message("Building with suffix ${SUFFIX}(${CMAKE_BUILD_TYPE}), for x${ARCH}")
 # Figure out if the folder given is a release or not
 if(EXISTS ${X64DBGFOLDER}/bin)
     set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${X64DBGFOLDER}/bin/x${ARCH}${SUFFIX}/plugins)
     set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${X64DBGFOLDER}/bin/x${ARCH}${SUFFIX}/plugins)
     include_directories( ${X64DBGFOLDER}/release )
-    LINK_DIRECTORIES( ${X64DBGFOLDER}/bin/x${ARCH}${SUFFIX} )
+
+    set(PLUGINSDK_DIR ${X64DBGFOLDER}/release/pluginsdk )
+    LINK_DIRECTORIES( ${X64DBGFOLDER}/bin/x${ARCH}${SUFFIX})
 else()
     set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${X64DBGFOLDER}/release/x${ARCH}${SUFFIX}/plugins)
     set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${X64DBGFOLDER}/release/x${ARCH}${SUFFIX}/plugins)
     include_directories( ${X64DBGFOLDER} )
+
+    set(PLUGINSDK_DIR ${X64DBGFOLDER}/pluginsdk )
     LINK_DIRECTORIES( ${X64DBGFOLDER}/pluginsdk )
 endif()
+
+LINK_DIRECTORIES(${PLUGINSDK_DIR}/jansson)
 
 include_directories( . ChaiScript/include)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -55,5 +63,10 @@ add_library(chaiScriptPlugin SHARED
 set_source_files_properties(Std.cc PROPERTIES COMPILE_FLAGS "/YcStd.h")
 set_source_files_properties(pluginmain.cc   PROPERTIES COMPILE_FLAGS "/YuStd.h")
 
-target_link_libraries(chaiScriptPlugin x${ARCH}dbg x${ARCH}bridge Qt5::Core Qt5::Widgets  )
+target_link_libraries(chaiScriptPlugin
+        x${ARCH}dbg
+        x${ARCH}bridge
+        Qt5::Core Qt5::Widgets
+        jansson_x${ARCH_NAME}
+    )
 set_target_properties(chaiScriptPlugin PROPERTIES SUFFIX ".dp${ARCH}")
