@@ -32,6 +32,7 @@ static std::set<std::string> commands;
 static std::set<std::string> workspace_set;
 static std::vector<std::string> workspace;
 
+std::thread chaiAsyncThread;
 duint chaiEvalDirect(const char* cmd) {
     try {
         auto bv = chai.eval(cmd);
@@ -41,6 +42,9 @@ duint chaiEvalDirect(const char* cmd) {
         if(bv.get_type_info().name() == "bool") {
             return chai.boxed_cast<bool>(bv);
         }
+        if(bv.get_type_info().name() == "void") {
+            return 0;
+        }
         _plugin_logprintf(" >>> bv type is: %s \n" , bv.get_type_info().name().c_str() );
         return 0;
     }
@@ -49,6 +53,19 @@ duint chaiEvalDirect(const char* cmd) {
     }
 
     return 0;
+}
+
+duint chaiEvalDirect(const char* cmd, bool async) {
+    if(async) {
+        if(chaiAsyncThread.joinable())
+            chaiAsyncThread.join();
+        chaiAsyncThread = std::thread([] (std::string cmd) {
+            chaiEvalDirect(cmd.c_str());
+        }, std::string(cmd));
+        return 0;
+    } else {
+        return chaiEvalDirect(cmd);
+    }
 }
 
 bool chaiEvalCommand(int argc, char* argv[]) {
@@ -70,12 +87,18 @@ bool chaiEvalCommand(int argc, char* argv[]) {
     return chaiEvalDirect(cmd.str().c_str());
 }
 
-
 bool chaiEval(int argc, char* argv[]) {
     if(argc < 2)
         return false;
 
     return chaiEvalDirect(argv[1]);
+}
+
+bool chaiEvalAsync(int argc, char* argv[]) {
+    if(argc < 2)
+        return false;
+
+    return chaiEvalDirect(argv[1], true);
 }
 
 bool chaiShowEnv(int argc, char* argv[]) {
@@ -178,8 +201,8 @@ bool chaiRegisterCommand(const char* cmd) {
     const auto funcs = chai.get_state().engine_state.m_boxed_functions;
     try {
         const chaiscript::Boxed_Value& c = chai.eval(std::string(cmd) + ".get_arity()");
-        int arity =  chaiscript::boxed_cast<int>(c);
-        _plugin_registerexprfunctionuserdata(pluginHandle, cmd, arity, chaiExpr, new std::string(cmd));
+        int arity = chaiscript::boxed_cast<int>(c);
+        _plugin_registerexprfunction(pluginHandle, cmd, arity, chaiExpr, new std::string(cmd));
     }
     catch ( const std::exception &e ) {
         _plugin_logprintf(" >>> Exception thrown: %s \n" , e.what( ) );
@@ -296,6 +319,9 @@ extern "C" DLL_EXPORT bool pluginit(PLUG_INITSTRUCT* initStruct) {
     if(!_plugin_registercommand(pluginHandle, "chaiEval", chaiEval, false))
         _plugin_logputs("error registering the \"chaiEval\" command!");
 
+    if(!_plugin_registercommand(pluginHandle, "chaiEvalAsync", chaiEvalAsync, false))
+        _plugin_logputs("error registering the \"chaiEvalAsync\" command!");
+
    if(!_plugin_registercommand(pluginHandle, "chaiLoad", chaiLoad, false))
        _plugin_logputs("error registering the \"chaiLoad\" command!");
 
@@ -331,6 +357,8 @@ extern "C" DLL_EXPORT void plugsetup(PLUG_SETUPSTRUCT* setupStruct) {
 extern "C" DLL_EXPORT bool plugstop() {
     delete fileWatcher;
     fileWatcher = 0;
+    if(chaiAsyncThread.joinable())
+        chaiAsyncThread.join();
     return true;
 }
 
